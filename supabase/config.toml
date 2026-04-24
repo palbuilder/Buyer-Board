@@ -1,0 +1,15 @@
+project_id = "buyerboard"
+
+[db]
+# Keep this aligned with the hosted Supabase Postgres major version when local CLI workflows
+# need a shadow database or local reset.
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+# BuyerBoard uses the JS seed script for realistic multi-user QA data instead of a static SQL seed.
+enabled = false
+sql_paths = []

@@ -1,0 +1,31 @@
+BuyerBoard Vercel environment variable checklist
+
+Required for the app to talk to Supabase:
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+# If your project uses the anon key instead of the publishable key, use this instead:
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+
+Required for server-side admin actions:
+SUPABASE_SERVICE_ROLE_KEY=
+
+Set this to your Vercel site URL after the first deployment:
+BUYERBOARD_APP_URL=
+
+Required for CAPTCHA in real online environments:
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+
+Optional for Stripe flows:
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+
+Optional for email sending:
+RESEND_API_KEY=
+BUYERBOARD_EMAIL_FROM=
+
+Optional for internal job routes:
+BUYERBOARD_INTERNAL_CRON_SECRET=
+
+Keep this OFF online:
+BUYERBOARD_ENABLE_LOCAL_CAPTCHA_BYPASS=false

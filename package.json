@@ -1,0 +1,42 @@
+{
+  "name": "reverse-marketplace-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:check": "node scripts/schema-readiness.mjs",
+    "db:link": "supabase link",
+    "db:migration:new": "supabase migration new",
+    "db:migration:list": "node scripts/supabase-migrations.mjs list",
+    "db:push": "node scripts/supabase-migrations.mjs push",
+    "db:push:dry-run": "node scripts/supabase-migrations.mjs push --dry-run",
+    "db:reset:local": "supabase db reset",
+    "qa:readiness": "node scripts/qa-readiness.mjs",
+    "qa:regression": "node scripts/qa-regression.mjs",
+    "qa:smoke": "node scripts/launch-qa-smoke.mjs",
+    "seed:dev": "node scripts/dev-seed.mjs --apply"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.101.1",
+    "next": "16.2.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "resend": "^6.10.0",
+    "stripe": "^21.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.2",
+    "supabase": "^2.93.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

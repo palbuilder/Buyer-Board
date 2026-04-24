@@ -1,0 +1,392 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdf0d5;
+  --foreground: #0c1821;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --line: rgba(12, 24, 33, 0.16);
+  --accent: #577590;
+  --accent-strong: #126590;
+  --accent-soft: #bcf8ec;
+  --hero: #126590;
+  --hero-strong: #0d4c6c;
+  --ink-soft: #32424f;
+  --shadow-lg: 0 16px 38px rgba(26, 37, 48, 0.08);
+  --shadow-md: 0 8px 20px rgba(26, 37, 48, 0.05);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(188, 248, 236, 0.82), transparent 24%),
+    radial-gradient(circle at 88% 10%, rgba(18, 101, 144, 0.18), transparent 28%),
+    radial-gradient(circle at 50% 88%, rgba(87, 117, 144, 0.12), transparent 30%),
+    linear-gradient(180deg, #fff9ef 0%, #fdf0d5 58%, #fae9c6 100%);
+  color: var(--foreground);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--foreground);
+  font-family: var(--font-display), sans-serif;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a[href] {
+  cursor: pointer;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:not(:disabled),
+select,
+summary,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+select,
+option {
+  color: var(--foreground);
+}
+
+option {
+  background: white;
+}
+
+::selection {
+  background: rgba(87, 117, 144, 0.24);
+}
+
+.brand-button {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 10px 20px rgba(87, 117, 144, 0.18);
+  border: 1px solid rgba(12, 24, 33, 0.08);
+}
+
+.brand-button:hover {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.brand-hero-button {
+  background: var(--hero);
+  color: white;
+  box-shadow: 0 12px 24px rgba(18, 101, 144, 0.2);
+  border: 1px solid rgba(12, 24, 33, 0.08);
+}
+
+.brand-hero-button:hover {
+  background: var(--hero-strong);
+  transform: translateY(-1px);
+}
+
+.brand-outline {
+  border-color: rgba(12, 24, 33, 0.14);
+}
+
+.brand-pill {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+.brand-alert {
+  background: rgba(87, 117, 144, 0.12);
+  color: var(--foreground);
+}
+
+.glass-panel {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+}
+
+.modern-card {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-md);
+}
+
+.gallery-request-card {
+  min-height: 100%;
+}
+
+.gallery-media-frame {
+  aspect-ratio: 1 / 1;
+  background:
+    linear-gradient(180deg, rgba(188, 248, 236, 0.34), rgba(253, 240, 213, 0.82));
+}
+
+.view-toggle-shell {
+  gap: 0.25rem;
+  border: 1px solid rgba(12, 24, 33, 0.16);
+  background: linear-gradient(180deg, rgba(237, 241, 245, 0.96), rgba(224, 231, 236, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(12, 24, 33, 0.06),
+    0 10px 22px rgba(12, 24, 33, 0.08);
+}
+
+.view-toggle-option {
+  position: relative;
+  min-width: 6.5rem;
+  justify-content: center;
+  color: var(--ink-soft);
+}
+
+.view-toggle-option-active {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 249, 250, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 6px 16px rgba(12, 24, 33, 0.12);
+}
+
+.view-toggle-option[aria-current="page"] {
+  color: var(--foreground);
+}
+
+.page-shell {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 86rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .page-shell {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-shell {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.section-card {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(14px);
+}
+
+.data-card {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-md);
+}
+
+.subtle-panel {
+  border: 1px solid rgba(12, 24, 33, 0.1);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.metric-tile {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 16px rgba(12, 24, 33, 0.04);
+}
+
+.tight-button {
+  border-radius: 0.95rem;
+  padding: 0.78rem 1rem;
+}
+
+.outline-button {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--foreground);
+}
+
+.outline-button:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.form-card {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.field-label {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.field-input,
+.field-select,
+.field-textarea {
+  width: 100%;
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--foreground);
+  outline: none;
+}
+
+.field-input,
+.field-select {
+  border-radius: 1rem;
+  padding: 0.8rem 0.95rem;
+}
+
+.field-textarea {
+  border-radius: 1rem;
+  padding: 0.9rem 0.95rem;
+}
+
+.field-input::placeholder,
+.field-textarea::placeholder {
+  color: rgba(64, 80, 95, 0.72);
+}
+
+.field-help {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: rgba(64, 80, 95, 0.9);
+}
+
+.secondary-button {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
+}
+
+.secondary-button:hover {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.soft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(12, 24, 33, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--foreground);
+  border-radius: 999px;
+  padding: 0.38rem 0.72rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.soft-chip-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(12, 24, 33, 0.08);
+  background: rgba(245, 242, 235, 0.9);
+  color: rgba(50, 66, 79, 0.95);
+  border-radius: 999px;
+  padding: 0.38rem 0.72rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.38rem 0.78rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.status-pill-neutral {
+  border: 1px solid rgba(12, 24, 33, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  color: rgba(50, 66, 79, 0.95);
+}
+
+.status-pill-accent {
+  background: var(--accent-soft);
+  color: #0f4f49;
+}
+
+.ghost-action {
+  border: 1px solid rgba(12, 24, 33, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--foreground);
+  border-radius: 999px;
+  padding: 0.55rem 0.92rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ghost-action:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+.help-drawer {
+  max-height: min(42rem, calc(100vh - 7rem));
+  overflow: auto;
+}
+
+.help-fab {
+  box-shadow: 0 14px 32px rgba(18, 101, 144, 0.24);
+}
+
+.danger-action {
+  border: 1px solid rgba(190, 24, 93, 0.24);
+  background: rgba(255, 241, 242, 0.92);
+  color: #9f1239;
+  border-radius: 999px;
+  padding: 0.55rem 0.92rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.danger-action:hover {
+  background: rgba(255, 228, 230, 0.98);
+}
+
+.empty-state {
+  border: 1px dashed rgba(12, 24, 33, 0.16);
+  background: rgba(255, 255, 255, 0.76);
+  border-radius: 1rem;
+  padding: 1rem;
+  font-size: 0.92rem;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}

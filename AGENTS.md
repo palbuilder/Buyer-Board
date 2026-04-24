@@ -1,0 +1,36 @@
+# BuyerBoard Local Codex Notes
+
+- Work only inside `C:\Users\palcs\Documents\buyerboard`.
+- Use `npm.cmd run ...` on Windows if plain `npm run ...` is flaky in the shell wrapper.
+- BuyerBoard schema changes now use tracked Supabase migrations.
+  - `supabase/migrations/*.sql` is the executable source of truth.
+  - `supabase/schema.sql` stays as the readable full-schema snapshot and should be updated in the same change set.
+- Before schema work, run:
+  - `npm.cmd run db:check`
+- Common schema commands:
+  - `npm.cmd run db:migration:new -- add_descriptive_name`
+  - `npm.cmd run db:push:dry-run`
+  - `npm.cmd run db:push`
+  - `npm.cmd run db:migration:list`
+- Remote schema pushes should prefer `SUPABASE_DB_URL` in `.env.local` for non-interactive Codex runs.
+  Linked-project pushes also work after `npm.cmd run db:link -- --project-ref YOUR_PROJECT_REF`.
+- Before browser QA, run:
+  - `npm.cmd run qa:readiness`
+  - `npm.cmd run qa:smoke`
+  - `npm.cmd run lint`
+  - `npm.cmd run build`
+- Seeded multi-user QA needs:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SUPABASE_DB_URL` if Codex should be able to push schema changes non-interactively
+  - `BUYERBOARD_APP_URL`
+- Internal digest and stale-request checks need:
+  - `BUYERBOARD_INTERNAL_CRON_SECRET`
+- Local-only captcha bypass is allowed only when all of these are true:
+  - `BUYERBOARD_ENABLE_LOCAL_CAPTCHA_BYPASS=true`
+  - `SUPABASE_SERVICE_ROLE_KEY` is set
+  - the app is running on localhost
+  - `NODE_ENV` is not `production`
+- `node scripts/dev-seed.mjs` is preview only.
+- `npm.cmd run seed:dev` actually writes the 5 seeded users plus recent requests/offers/messages.
