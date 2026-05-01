@@ -613,7 +613,7 @@ async function printMagicLinks(supabase) {
   const appUrl = process.env.BUYERBOARD_APP_URL?.trim() || "http://localhost:3000";
 
   console.log("");
-  console.log("Fresh local magic links");
+  console.log("Fresh BuyerBoard magic links");
   for (const user of seedUsers) {
     const { data, error } = await supabase.auth.admin.generateLink({
       type: "magiclink",
@@ -627,8 +627,22 @@ async function printMagicLinks(supabase) {
       throw error;
     }
 
+    const tokenHash = data.properties?.hashed_token ?? "";
+
+    if (!tokenHash) {
+      throw new Error(`Supabase did not return a usable magic-link token for ${user.email}.`);
+    }
+
+    // Admin-generated Supabase action links verify on the Supabase domain first.
+    // For SSR cookies to land on BuyerBoard's domain, route the token hash through
+    // the app callback and let the callback verify it there.
+    const appMagicLink = new URL("/auth/callback", appUrl);
+    appMagicLink.searchParams.set("next", "/dashboard");
+    appMagicLink.searchParams.set("token_hash", tokenHash);
+    appMagicLink.searchParams.set("type", "magiclink");
+
     console.log(`- ${user.email}`);
-    console.log(`  ${data.properties.action_link}`);
+    console.log(`  ${appMagicLink.toString()}`);
   }
 }
 

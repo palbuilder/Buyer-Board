@@ -6,6 +6,14 @@ import { getRequestOrigin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseLocalCaptchaBypass, hasTurnstileEnv } from "@/lib/turnstile/config";
 
+function buildAppMagicLink(origin: string, next: string, tokenHash: string) {
+  const callbackUrl = new URL("/auth/callback", origin);
+  callbackUrl.searchParams.set("next", next);
+  callbackUrl.searchParams.set("token_hash", tokenHash);
+  callbackUrl.searchParams.set("type", "magiclink");
+  return callbackUrl.toString();
+}
+
 async function ensureLocalBypassUserExists(
   adminClient: NonNullable<ReturnType<typeof createAdminClient>>,
   email: string,
@@ -76,7 +84,7 @@ export async function sendSignInLink(formData: FormData) {
       );
     }
 
-    let actionLink = "";
+    let appMagicLink = "";
 
     try {
       await ensureLocalBypassUserExists(adminClient, email);
@@ -92,17 +100,19 @@ export async function sendSignInLink(formData: FormData) {
         throw new Error(error.message);
       }
 
-      actionLink = data.properties?.action_link ?? "";
+      const tokenHash = data.properties?.hashed_token ?? "";
 
-      if (!actionLink) {
-        throw new Error("Supabase did not return a usable magic link.");
+      if (!tokenHash) {
+        throw new Error("Supabase did not return a usable magic-link token.");
       }
+
+      appMagicLink = buildAppMagicLink(origin, next, tokenHash);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to generate the local sign-in link.";
       redirect(`/auth?error=${encodeURIComponent(message)}&next=${encodeURIComponent(next)}`);
     }
 
-    redirect(actionLink);
+    redirect(appMagicLink);
   }
 
   const supabase = await createClient();

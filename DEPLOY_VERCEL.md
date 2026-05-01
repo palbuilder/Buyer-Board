@@ -144,6 +144,15 @@ Make sure the allowed hostname includes your Vercel site hostname.
 
 Without these updates, auth and CAPTCHA can look broken online even if the code is fine.
 
+If the Turnstile box says **Unable to connect to website**, check the widget's Hostname Management settings in Cloudflare.
+Add the hostname only, without `https://` and without any path.
+
+Example:
+
+```text
+buyer-board.vercel.app
+```
+
 ## First Online Test Session
 
 After the first deployment, test in this order:

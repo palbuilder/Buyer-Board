@@ -40,7 +40,14 @@ function main() {
 
   const authActions = readProjectFile("app/auth/actions.ts");
   assertIncludes(authActions, "adminClient.auth.admin.generateLink", "Local captcha bypass should generate a local magic link instead of weakening production auth.");
+  assertIncludes(authActions, "data.properties?.hashed_token", "Local captcha bypass should use Supabase's hashed token for app-domain session verification.");
+  assertIncludes(authActions, 'callbackUrl.searchParams.set("token_hash", tokenHash);', "Local captcha bypass should send magic links through the app callback.");
   assertIncludes(authActions, "Local CAPTCHA bypass needs SUPABASE_SERVICE_ROLE_KEY in .env.local.", "Auth action should explain the missing local bypass prerequisite clearly.");
+
+  const authCallback = readProjectFile("app/auth/callback/route.ts");
+  assertIncludes(authCallback, "exchangeCodeForSession(code)", "Auth callback should keep supporting normal code-exchange sign-in links.");
+  assertIncludes(authCallback, "verifyOtp({", "Auth callback should support token-hash magic links generated for seeded users.");
+  assertIncludes(authCallback, "token_hash: tokenHash!", "Auth callback should verify Supabase token hashes on the app domain.");
 
   const community = readProjectFile("lib/community.ts");
   assertIncludes(community, 'if (input.actorRole === "admin") {', "Messaging rules should still give admins a special outreach path.");
@@ -60,6 +67,11 @@ function main() {
   });
   assertIncludes(seedPreviewOutput, "DRY RUN ONLY: no seed users, requests, notifications, or reports were written.", "Seed preview should say clearly that nothing was written.");
   assertIncludes(seedPreviewOutput, "seller opportunity feed shows them immediately", "Seed preview should explain that the seeded requests are fresh enough for seller testing.");
+
+  const devSeed = readProjectFile("scripts/dev-seed.mjs");
+  assertIncludes(devSeed, "data.properties?.hashed_token", "Dev seed magic links should use token hashes instead of Supabase-hosted action links.");
+  assertIncludes(devSeed, 'appMagicLink.searchParams.set("token_hash", tokenHash);', "Dev seed magic links should point at BuyerBoard's callback.");
+  assert(!devSeed.includes("data.properties.action_link"), "Dev seed should not print Supabase action links for SSR sign-in.");
 
   console.log("BuyerBoard regression audit checks passed.");
 }
