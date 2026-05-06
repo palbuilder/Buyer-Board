@@ -11,10 +11,22 @@ type MessageComposerProps = {
 };
 
 const promptTemplates = [
-  "Hi, I have a few questions about condition and exact fitment before I move forward.",
-  "Can you confirm the final shipped price, condition, and what is included?",
-  "What claim window would work for you if we agree on this offer?",
-  "Can you share any details about wear, defects, or missing parts before I accept?",
+  {
+    label: "Ask condition",
+    body: "Can you confirm the condition, any defects, and exactly what is included?",
+  },
+  {
+    label: "Confirm fit",
+    body: "Can you confirm this matches the request details before we move forward?",
+  },
+  {
+    label: "Check final price",
+    body: "Can you confirm the final all-in price and whether shipping is included?",
+  },
+  {
+    label: "Claim timing",
+    body: "What claim window would work for you if we agree on this offer?",
+  },
 ];
 
 export function MessageComposer({ action, threadId, isBlocked, blockNotice, requestTitle }: MessageComposerProps) {
@@ -36,12 +48,12 @@ export function MessageComposer({ action, threadId, isBlocked, blockNotice, requ
       <div className="flex flex-wrap gap-2">
         {promptTemplates.map((template) => (
           <button
-            key={template}
+            key={template.label}
             type="button"
-            onClick={() => applyTemplate(template)}
+            onClick={() => applyTemplate(template.body)}
             className="secondary-button rounded-full px-3 py-2 text-xs font-medium"
           >
-            Use prompt
+            {template.label}
           </button>
         ))}
       </div>

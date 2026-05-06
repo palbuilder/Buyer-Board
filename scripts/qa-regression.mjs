@@ -58,6 +58,21 @@ function main() {
   assertIncludes(notificationBell, "Stay on the current page while you read and clear updates.", "Notification tray copy should reinforce in-place behavior.");
   assert(!notificationBell.includes('href="/notifications"'), "Notification bell tray should not be wired as a redirect-first notifications page.");
 
+  const messageComposer = readProjectFile("app/messages/message-composer.tsx");
+  assertIncludes(messageComposer, 'label: "Ask condition"', "Message prompt buttons should have clear labels.");
+  assertIncludes(messageComposer, "setBody(next);", "Message prompt buttons should insert useful text into the composer.");
+  assert(!messageComposer.includes(">Use prompt<"), "Message prompt buttons should not all render with the generic Use prompt label.");
+
+  const messagesPage = readProjectFile("app/messages/page.tsx");
+  assertIncludes(messagesPage, "Review offer", "Related message threads should give buyers a clear offer review action.");
+  assertIncludes(messagesPage, "Review counteroffer", "Related message threads should give sellers a clear counteroffer action.");
+
+  const dashboardPage = readProjectFile("app/dashboard/page.tsx");
+  assertIncludes(dashboardPage, 'href="/dashboard?tab=admin"', "Admin users should get a clear dashboard admin tab.");
+  assertIncludes(dashboardPage, "Admin workspace", "Admin queues should live in a dedicated admin dashboard section.");
+  assertIncludes(dashboardPage, "Open request", "Dashboard request and claim cards should expose clear open-request actions.");
+  assertIncludes(dashboardPage, "Review counteroffer", "Seller countered-offer cards should expose a direct review action.");
+
   const requestsPage = readProjectFile("app/requests/page.tsx");
   assertIncludes(requestsPage, "node scripts/dev-seed.mjs", "Requests page should help local testers understand the seed preview vs apply path.");
 

@@ -34,6 +34,8 @@ export type WantedRequest = {
 export type SellerOffer = {
   id: string;
   requestId: string;
+  requestSlug?: string;
+  requestTitle?: string;
   sellerId?: string;
   sellerName: string;
   imageUrls: string[];
@@ -85,6 +87,7 @@ export type DirectNegotiationContext = {
   requestTitle: string;
   buyerId: string;
   sellerId: string;
+  latestOfferStatus: SellerOffer["status"];
   latestOfferPriceLabel: string;
   latestClaimWindowLabel: string;
   latestOfferStatusLabel: string;

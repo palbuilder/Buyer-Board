@@ -47,7 +47,13 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
       ? "This member has blocked new private messages in this thread."
       : undefined;
 
-  const latestOfferStatus = negotiationContext?.latestOfferStatusLabel.toLowerCase() ?? "";
+  const latestOfferStatus = negotiationContext?.latestOfferStatus ?? "";
+  const viewerRoleInThread =
+    negotiationContext && profile?.id === negotiationContext.buyerId
+      ? "buyer"
+      : negotiationContext && profile?.id === negotiationContext.sellerId
+        ? "seller"
+        : undefined;
   const nextStepMessage =
     latestOfferStatus === "pending"
       ? "A live offer is waiting on the buyer. Use this thread to answer final questions and confirm details."
@@ -277,9 +283,32 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
                           {negotiationContext.latestOfferStatusLabel.toLowerCase()}.
                         </p>
                       </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
                       <Link className="ghost-action" href={`/requests/${negotiationContext.requestSlug}`}>
                         Open request
                       </Link>
+                      {viewerRoleInThread === "buyer" && (latestOfferStatus === "pending" || latestOfferStatus === "countered") ? (
+                        <Link className="brand-button rounded-full px-4 py-2 text-sm font-medium" href="/dashboard?tab=buyer">
+                          Review offer
+                        </Link>
+                      ) : null}
+                      {viewerRoleInThread === "seller" && latestOfferStatus === "countered" ? (
+                        <Link className="brand-button rounded-full px-4 py-2 text-sm font-medium" href="/dashboard?tab=seller">
+                          Review counteroffer
+                        </Link>
+                      ) : null}
+                      {viewerRoleInThread === "seller" && latestOfferStatus === "pending" ? (
+                        <Link className="ghost-action" href="/dashboard?tab=seller">
+                          View sent offer
+                        </Link>
+                      ) : null}
+                      {latestOfferStatus === "accepted" ? (
+                        <Link className="brand-button rounded-full px-4 py-2 text-sm font-medium" href={`/dashboard?tab=${viewerRoleInThread === "seller" ? "seller" : "buyer"}`}>
+                          Open claim queue
+                        </Link>
+                      ) : null}
                     </div>
 
                     <div className="subtle-panel mt-4 rounded-[1rem] px-4 py-3">
@@ -371,7 +400,7 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
                   threadId={selectedThread.threadId}
                   isBlocked={relationship.hasActiveBlock}
                   blockNotice={blockNotice}
-                  requestTitle={request}
+                  requestTitle={negotiationContext?.requestTitle ?? request}
                 />
               </>
             ) : (

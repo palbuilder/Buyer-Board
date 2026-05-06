@@ -135,7 +135,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect(`/dashboard?tab=seller&notice=${encodeURIComponent(payoutNotice)}`);
   }
 
-  const activeTab = tab === "seller" ? "seller" : "buyer";
+  const profile = await getCurrentProfile();
+  const activeTab = tab === "admin" && profile?.role === "admin" ? "admin" : tab === "seller" ? "seller" : "buyer";
   const localSeedApplyReady = process.env.NODE_ENV !== "production" && Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
   const intelCategory = typeof allSearchParams.intelCategory === "string" ? allSearchParams.intelCategory.trim() : "";
   const intelSubcategory = typeof allSearchParams.intelSubcategory === "string" ? allSearchParams.intelSubcategory.trim() : "";
@@ -144,7 +145,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const intelSinceHours = typeof allSearchParams.intelSinceHours === "string" ? allSearchParams.intelSinceHours.trim() : "24";
   const parsedIntelMinBudget = Number.parseInt(intelMinBudget, 10);
   const parsedIntelSinceHours = Number.parseInt(intelSinceHours, 10);
-  const profile = await getCurrentProfile();
   const [
     phoneVerification,
     sellerTrustGate,
@@ -305,31 +305,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         ) : null}
 
-        {profile?.role === "admin" ? (
-          <div className="mt-6 modern-card rounded-[1.5rem] p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Admin queues</p>
-                <h2 className="mt-2 text-2xl font-semibold">Moderation shortcuts</h2>
-                <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-                  Unsafe or dangerous request reports land in listing reports. Trust reviews and disputes stay in their own admin queues.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Link className="ghost-action" href="/admin/reports">
-                  Listing reports
-                </Link>
-                <Link className="ghost-action" href="/admin/disputes">
-                  Dispute queue
-                </Link>
-                <Link className="ghost-action" href="/admin/trust">
-                  Trust queue
-                </Link>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         {profile?.accountStatus === "flagged" ? (
           <div className="mt-6 rounded-[1.5rem] border border-rose-400/80 bg-rose-100 px-4 py-3 text-sm font-medium leading-7 text-rose-950">
             Warning / probation: this account is under trust review. Some actions, including seller payouts, may be temporarily limited.
@@ -430,9 +405,49 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           >
             Seller tab
           </Link>
+          {profile?.role === "admin" ? (
+            <Link
+              href="/dashboard?tab=admin"
+              className={`rounded-full px-5 py-3 text-sm font-medium transition ${activeTab === "admin" ? "brand-button" : "brand-outline border hover:bg-white/60"}`}
+            >
+              Admin tab
+            </Link>
+          ) : null}
         </div>
 
-        {activeTab === "buyer" ? (
+        {activeTab === "admin" ? (
+          <section className="mt-8 grid gap-5">
+            <div className="modern-card rounded-[1.75rem] p-5">
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Admin workspace</p>
+              <h2 className="mt-2 text-2xl font-semibold">Queues that need moderator action</h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-soft)]">
+                These links are admin-only. Listing reports include unsafe or dangerous request reports, disputes cover order problems, and trust covers account reviews and appeals.
+              </p>
+              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Link className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4 transition hover:border-[var(--hero)]/30 hover:bg-white" href="/admin/reports">
+                  <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">Listing reports</p>
+                  <p className="mt-2 text-lg font-semibold">Review unsafe listings</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">Request and offer reports, including unsafe or dangerous items.</p>
+                </Link>
+                <Link className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4 transition hover:border-[var(--hero)]/30 hover:bg-white" href="/admin/disputes">
+                  <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">Dispute queue</p>
+                  <p className="mt-2 text-lg font-semibold">Resolve order issues</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">Buyer and seller evidence for completed purchases.</p>
+                </Link>
+                <Link className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4 transition hover:border-[var(--hero)]/30 hover:bg-white" href="/admin/trust">
+                  <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">Trust queue</p>
+                  <p className="mt-2 text-lg font-semibold">Review accounts</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">Phone checks, account flags, suspensions, and appeals.</p>
+                </Link>
+                <Link className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4 transition hover:border-[var(--hero)]/30 hover:bg-white" href="/messages">
+                  <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">Admin outreach</p>
+                  <p className="mt-2 text-lg font-semibold">Message a member</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">Use admin-only member search for support or moderation follow-up.</p>
+                </Link>
+              </div>
+            </div>
+          </section>
+        ) : activeTab === "buyer" ? (
           <section className="mt-8 grid gap-5">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div className="modern-card rounded-[1.5rem] p-4">
@@ -790,6 +805,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       </span>
                     </div>
                     <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{request.summary}</p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link className="ghost-action" href={`/requests/${request.slug}`}>
+                        Open request
+                      </Link>
+                    </div>
                     {request.needsFreshnessConfirmation ? (
                       <div className="mt-4 rounded-[1.25rem] border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-950">
                         <p className="font-medium">{request.freshnessConfirmationLabel}</p>
@@ -838,6 +858,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-[var(--foreground)]">
                           {claim.paymentLabel}
                         </span>
+                        <Link className="ghost-action" href={`/requests/${claim.requestSlug}`}>
+                          Open request
+                        </Link>
                         {claim.paymentStatus === "awaiting_payment" ? (
                           <form action={beginClaimCheckout}>
                             <input type="hidden" name="requestId" value={claim.requestId} />
@@ -963,6 +986,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <span className="soft-chip-muted">{request.shipping}</span>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3">
+                        <Link className="ghost-action" href={`/requests/${request.slug}`}>
+                          Review on request
+                        </Link>
                         {offer.sellerId ? (
                           <Link className="ghost-action" href={`/sellers/${offer.sellerId}`}>
                             View seller profile
@@ -1417,7 +1443,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="mt-5 space-y-3">
                 {sellerData.sentOffers.map((offer) => (
                   <div key={offer.id} className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4">
-                    <p className="text-lg font-semibold">{offer.offeredPriceLabel}</p>
+                    <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">
+                      {offer.requestTitle ?? "Sent offer"}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold">{offer.offeredPriceLabel}</p>
                     <p className="mt-2 text-sm text-[var(--ink-soft)]">{offer.claimLabel}</p>
                     <p className="mt-1 text-sm text-[var(--ink-soft)]">{offer.message}</p>
                     <ImageStrip imageUrls={offer.imageUrls} altPrefix={`${offer.sellerName} sent offer`} />
@@ -1444,6 +1473,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         Buyer passed on this offer. You can move on or respond again later if the request reopens.
                       </p>
                     ) : null}
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {offer.requestSlug ? (
+                        <Link className={offer.status === "countered" ? "brand-button rounded-full px-4 py-2 text-sm font-medium" : "ghost-action"} href={`/requests/${offer.requestSlug}`}>
+                          {offer.status === "countered" ? "Review counteroffer" : "Open request"}
+                        </Link>
+                      ) : null}
+                      {offer.status === "countered" ? (
+                        <Link className="ghost-action" href="/messages">
+                          Open messages
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
                 {sellerData.sentOffers.length === 0 ? (

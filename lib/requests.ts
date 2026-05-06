@@ -653,7 +653,7 @@ function mapRequest(row: DbRequestRow): WantedRequest {
   };
 }
 
-function mapOffer(row: DbOfferRow): SellerOffer {
+function mapOffer(row: DbOfferRow, request?: { slug?: string; title?: string }): SellerOffer {
   const proposedHours = Number.parseInt(row.shipping_note?.replace(/[^0-9]/g, "") || "48", 10) || 48;
   const sellerName = row.estimated_ship_time?.startsWith("Seller:")
     ? row.estimated_ship_time.replace("Seller:", "").trim()
@@ -662,6 +662,8 @@ function mapOffer(row: DbOfferRow): SellerOffer {
   return {
     id: row.id,
     requestId: row.request_id,
+    requestSlug: request?.slug,
+    requestTitle: request?.title,
     sellerId: row.seller_id,
     sellerName,
     imageUrls: parseMediaUrls(row.image_urls),
@@ -985,7 +987,7 @@ export async function getSellerOffersForRequest(requestId: string): Promise<Sell
     return getMockOffers(requestId);
   }
 
-  const mappedOffers = data.map(mapOffer);
+  const mappedOffers = data.map((offer) => mapOffer(offer));
   const sellerIds = [...new Set(mappedOffers.map((offer) => offer.sellerId).filter((sellerId): sellerId is string => Boolean(sellerId)))];
   const snapshots = await getSellerSnapshots(sellerIds);
 
@@ -1088,6 +1090,7 @@ export async function getNegotiationContextForMembers(memberAId: string, memberB
     requestTitle: latestRequest.title,
     buyerId: latestRequest.buyer_id,
     sellerId: latestOffer.seller_id,
+    latestOfferStatus: latestOffer.status,
     latestOfferPriceLabel: formatCurrencyFromCents(latestOffer.offer_price_cents),
     latestClaimWindowLabel: `${latestHours} hours`,
     latestOfferStatusLabel: formatOfferStatusLabel(latestOffer.status),
@@ -1188,15 +1191,20 @@ export async function getSellerDashboardData(actorId?: string) {
     };
   }
 
-  const [activeClaims, performance, recentReviews] = await Promise.all([
+  const requestIds = [...new Set(data.map((offer) => offer.request_id))];
+  const [{ data: requestRows }, activeClaims, performance, recentReviews] = await Promise.all([
+    requestIds.length > 0
+      ? supabase.from("requests").select("id, slug, title").in("id", requestIds)
+      : Promise.resolve({ data: [] }),
     getActiveClaimsForSeller(user.id),
     getSellerPerformance(user.id),
     getSellerRecentReviews(user.id),
   ]);
   const openIssues = await getSellerIssues(user.id);
+  const requestsById = new Map((requestRows ?? []).map((request) => [request.id, request]));
 
   return {
-    sentOffers: data.map(mapOffer),
+    sentOffers: data.map((offer) => mapOffer(offer, requestsById.get(offer.request_id))),
     activeClaims,
     performance,
     recentReviews,
