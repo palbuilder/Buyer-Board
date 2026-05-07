@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImageStrip } from "@/app/components/image-strip";
+import { NegotiationTimeline, buildNegotiationTimeline, getOfferCurrentState } from "@/app/components/negotiation-timeline";
 import { getOptionalCurrentProfile } from "@/lib/auth";
 import { getRelationshipStatus } from "@/lib/community";
-import { getSellerOffersForRequest, getWantedRequestBySlug, isDemoMode } from "@/lib/requests";
+import { formatOfferPriceDeltaLabel, getSellerOffersForRequest, getWantedRequestBySlug, isDemoMode } from "@/lib/requests";
 import {
   blockSeller,
   followSeller,
@@ -340,6 +341,9 @@ export default async function RequestDetailPage({ params, searchParams }: Reques
                   <div className="rounded-[1rem] border border-stone-200 bg-white px-3 py-3">
                     <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-stone-500">Offer</p>
                     <p className="mt-2 text-lg font-semibold">{leadOffer.offeredPriceLabel}</p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      {leadOffer.priceDeltaLabel ?? formatOfferPriceDeltaLabel(leadOffer.offeredPrice, request.targetBudget)}
+                    </p>
                   </div>
                   <div className="rounded-[1rem] border border-stone-200 bg-white px-3 py-3">
                     <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-stone-500">Claim window</p>
@@ -383,6 +387,11 @@ export default async function RequestDetailPage({ params, searchParams }: Reques
                     <p className="text-sm text-stone-500">Lowest price</p>
                     <p className="mt-1 font-semibold">{lowestOffer?.offeredPriceLabel ?? "No offers yet"}</p>
                     {lowestOffer ? <p className="mt-1 text-sm text-[var(--ink-soft)]">{lowestOffer.sellerName}</p> : null}
+                    {lowestOffer ? (
+                      <p className="mt-1 text-xs text-stone-500">
+                        {lowestOffer.priceDeltaLabel ?? formatOfferPriceDeltaLabel(lowestOffer.offeredPrice, request.targetBudget)}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="rounded-[1rem] border border-stone-200 bg-white px-4 py-3">
                     <p className="text-sm text-stone-500">Highest rating</p>
@@ -413,7 +422,16 @@ export default async function RequestDetailPage({ params, searchParams }: Reques
 
           <div className="mt-5 grid max-h-[52rem] gap-4 overflow-y-auto pr-1">
             {sortedOffers.length > 0 ? (
-              sortedOffers.map((offer, index) => (
+              sortedOffers.map((offer, index) => {
+                const currentState = getOfferCurrentState(offer.status);
+                const priceDeltaLabel = offer.priceDeltaLabel ?? formatOfferPriceDeltaLabel(offer.offeredPrice, request.targetBudget);
+                const timelineItems = buildNegotiationTimeline({
+                  request,
+                  offer,
+                  priceDeltaLabel,
+                });
+
+                return (
                 <div key={offer.id} className="rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -421,6 +439,7 @@ export default async function RequestDetailPage({ params, searchParams }: Reques
                         {index === 0 ? "Lead offer" : `Offer ${index + 1}`} / {offer.sellerName}
                       </p>
                       <p className="mt-1 text-xl font-semibold">{offer.offeredPriceLabel}</p>
+                      <p className="mt-1 text-sm text-[var(--ink-soft)]">{priceDeltaLabel}</p>
                     </div>
                     <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-medium text-teal-950">
                       {offer.status}
@@ -451,6 +470,12 @@ export default async function RequestDetailPage({ params, searchParams }: Reques
                     <p>{offer.claimLabel}</p>
                     <p>{offer.etaLabel}</p>
                   </div>
+                  <NegotiationTimeline
+                    currentStateLabel={currentState.label}
+                    currentStateDetail={currentState.detail}
+                    items={timelineItems}
+                    requestHref={`/requests/${request.slug}`}
+                  />
                   <ImageStrip imageUrls={offer.imageUrls} altPrefix={`${offer.sellerName} offer photo`} />
                   <OfferReportForm action={submitListingReport} requestId={request.id} slug={request.slug} offerId={offer.id} />
                   {offer.sellerId && profile?.id !== offer.sellerId ? (
@@ -505,7 +530,8 @@ export default async function RequestDetailPage({ params, searchParams }: Reques
                     </div>
                   ) : null}
                 </div>
-              ))
+                );
+              })
             ) : (
               <div className="empty-state rounded-[1rem]">
                 No live offers yet. The first seller response will start the conversation and introduce a proposed claim window.

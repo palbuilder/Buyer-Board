@@ -2,6 +2,7 @@ import { sellerOffers as mockSellerOffers, wantedRequests, getOffersForRequest a
 import { ensureProfileForUser, getCurrentProfile, getCurrentUser, getRequestOrigin, requireMarketplaceAccess, requireVerifiedPhone } from "@/lib/auth";
 import { derivePublicLocationLabel } from "@/lib/location";
 import { parseMediaUrls } from "@/lib/media";
+import { validateMarketplaceMessage } from "@/lib/moderation";
 import { createNotification } from "@/lib/notifications";
 import { logBuyerBoardEvent } from "@/lib/observability";
 import {
@@ -28,6 +29,7 @@ import type {
   MarketplaceTrendItem,
   MemberTrustAppeal,
   NegotiationOfferHistoryItem,
+  NegotiationTimelineMessage,
   PublicSellerProfile,
   SellerIssue,
   SellerOffer,
@@ -70,6 +72,14 @@ type DbOfferRow = {
   estimated_ship_time: string | null;
   status: SellerOffer["status"];
   created_at?: string;
+};
+
+type DbRequestMessageRow = {
+  id: string;
+  request_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
 };
 
 type DbClaimEventRow = {
@@ -209,6 +219,17 @@ function formatCurrencyFromCents(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value / 100);
+}
+
+export function formatOfferPriceDeltaLabel(offerPrice: number, targetBudget: number) {
+  const deltaCents = Math.round((offerPrice - targetBudget) * 100);
+
+  if (deltaCents === 0) {
+    return "Matches requested price";
+  }
+
+  const direction = deltaCents > 0 ? "above" : "below";
+  return `${formatCurrencyFromCents(Math.abs(deltaCents))} ${direction} requested`;
 }
 
 function formatRelativeDate(dateInput: string) {
@@ -653,30 +674,40 @@ function mapRequest(row: DbRequestRow): WantedRequest {
   };
 }
 
-function mapOffer(row: DbOfferRow, request?: { slug?: string; title?: string }): SellerOffer {
+function mapOffer(row: DbOfferRow, request?: { slug?: string; title?: string; target_price_cents?: number | null; created_at?: string | null }): SellerOffer {
   const proposedHours = Number.parseInt(row.shipping_note?.replace(/[^0-9]/g, "") || "48", 10) || 48;
   const sellerName = row.estimated_ship_time?.startsWith("Seller:")
     ? row.estimated_ship_time.replace("Seller:", "").trim()
     : "Seller";
+  const offeredPrice = row.offer_price_cents / 100;
 
   return {
     id: row.id,
     requestId: row.request_id,
     requestSlug: request?.slug,
     requestTitle: request?.title,
+    requestBudgetLabel:
+      typeof request?.target_price_cents === "number" ? `${formatCurrencyFromCents(request.target_price_cents)} target` : undefined,
+    requestPostedLabel: request?.created_at ? formatRelativeDate(request.created_at) : undefined,
     sellerId: row.seller_id,
     sellerName,
     imageUrls: parseMediaUrls(row.image_urls),
     sellerRating: 5,
     sellerReviewCount: 0,
     shippedWithinWindowRate: 0,
-    offeredPrice: row.offer_price_cents / 100,
+    offeredPrice,
     offeredPriceLabel: formatCurrencyFromCents(row.offer_price_cents),
+    priceDeltaLabel:
+      typeof request?.target_price_cents === "number"
+        ? formatOfferPriceDeltaLabel(offeredPrice, request.target_price_cents / 100)
+        : undefined,
     message: row.message,
     etaLabel: "Message sent and offer pending buyer review",
     proposedClaimWindowHours: proposedHours,
     claimLabel: `Proposed claim window: ${proposedHours} hours, pending buyer approval`,
     status: row.status,
+    createdAt: row.created_at,
+    createdLabel: row.created_at ? formatRelativeDate(row.created_at) : undefined,
   };
 }
 
@@ -684,11 +715,28 @@ function formatOfferStatusLabel(status: SellerOffer["status"]) {
   const labels: Record<SellerOffer["status"], string> = {
     pending: "Awaiting buyer review",
     accepted: "Accepted by buyer",
-    declined: "Denied by buyer",
+    declined: "Declined by buyer",
     countered: "Countered by buyer",
   };
 
   return labels[status];
+}
+
+function mapRequestNegotiationMessages(input: {
+  messages: DbRequestMessageRow[];
+  buyerId?: string;
+  sellerId?: string;
+}): NegotiationTimelineMessage[] {
+  return input.messages
+    .filter((message) => message.sender_id === input.buyerId || message.sender_id === input.sellerId)
+    .map((message) => ({
+      id: message.id,
+      senderId: message.sender_id,
+      actorLabel: message.sender_id === input.sellerId ? "Seller" : "Buyer",
+      body: message.body,
+      createdAt: message.created_at,
+      createdLabel: formatRelativeDate(message.created_at),
+    }));
 }
 
 async function getSellerSnapshots(sellerIds: string[]) {
@@ -987,7 +1035,33 @@ export async function getSellerOffersForRequest(requestId: string): Promise<Sell
     return getMockOffers(requestId);
   }
 
-  const mappedOffers = data.map((offer) => mapOffer(offer));
+  const [{ data: requestRow }, { data: messageRows }] = await Promise.all([
+    supabase
+      .from("requests")
+      .select("id, buyer_id, target_price_cents")
+      .eq("id", requestId)
+      .maybeSingle(),
+    supabase
+      .from("messages")
+      .select("id, request_id, sender_id, body, created_at")
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const mappedOffers = data.map((offer) => {
+    const mappedOffer = mapOffer(offer, {
+      target_price_cents: requestRow?.target_price_cents,
+    });
+
+    return {
+      ...mappedOffer,
+      timelineMessages: mapRequestNegotiationMessages({
+        messages: (messageRows ?? []) as DbRequestMessageRow[],
+        buyerId: requestRow?.buyer_id,
+        sellerId: offer.seller_id,
+      }),
+    };
+  });
   const sellerIds = [...new Set(mappedOffers.map((offer) => offer.sellerId).filter((sellerId): sellerId is string => Boolean(sellerId)))];
   const snapshots = await getSellerSnapshots(sellerIds);
 
@@ -1015,7 +1089,7 @@ export async function getNegotiationContextForMembers(memberAId: string, memberB
   const [{ data: requestRows }, { data: offerRows }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, slug, title, buyer_id, shipping_preference, location_label, status, created_at")
+      .select("id, slug, title, buyer_id, shipping_preference, location_label, target_price_cents, status, created_at")
       .in("buyer_id", [memberAId, memberBId]),
     supabase
       .from("offers")
@@ -1031,6 +1105,7 @@ export async function getNegotiationContextForMembers(memberAId: string, memberB
     buyer_id: string;
     shipping_preference: string | null;
     location_label: string | null;
+    target_price_cents: number;
     status: WantedRequest["status"];
     created_at: string;
   }>;
@@ -1092,6 +1167,7 @@ export async function getNegotiationContextForMembers(memberAId: string, memberB
     sellerId: latestOffer.seller_id,
     latestOfferStatus: latestOffer.status,
     latestOfferPriceLabel: formatCurrencyFromCents(latestOffer.offer_price_cents),
+    latestOfferPriceDeltaLabel: formatOfferPriceDeltaLabel(latestOffer.offer_price_cents / 100, latestRequest.target_price_cents / 100),
     latestClaimWindowLabel: `${latestHours} hours`,
     latestOfferStatusLabel: formatOfferStatusLabel(latestOffer.status),
     shippingLabel: latestRequest.shipping_preference ?? "Shipping details pending",
@@ -1177,7 +1253,7 @@ export async function getSellerDashboardData(actorId?: string) {
 
   const { data, error } = await supabase
     .from("offers")
-    .select("id, request_id, seller_id, image_urls, offer_price_cents, message, shipping_note, estimated_ship_time, status")
+    .select("id, request_id, seller_id, image_urls, offer_price_cents, message, shipping_note, estimated_ship_time, status, created_at")
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -1192,9 +1268,12 @@ export async function getSellerDashboardData(actorId?: string) {
   }
 
   const requestIds = [...new Set(data.map((offer) => offer.request_id))];
-  const [{ data: requestRows }, activeClaims, performance, recentReviews] = await Promise.all([
+  const [{ data: requestRows }, { data: messageRows }, activeClaims, performance, recentReviews] = await Promise.all([
     requestIds.length > 0
-      ? supabase.from("requests").select("id, slug, title").in("id", requestIds)
+      ? supabase.from("requests").select("id, slug, title, buyer_id, target_price_cents, created_at").in("id", requestIds)
+      : Promise.resolve({ data: [] }),
+    requestIds.length > 0
+      ? supabase.from("messages").select("id, request_id, sender_id, body, created_at").in("request_id", requestIds).order("created_at", { ascending: true })
       : Promise.resolve({ data: [] }),
     getActiveClaimsForSeller(user.id),
     getSellerPerformance(user.id),
@@ -1202,9 +1281,27 @@ export async function getSellerDashboardData(actorId?: string) {
   ]);
   const openIssues = await getSellerIssues(user.id);
   const requestsById = new Map((requestRows ?? []).map((request) => [request.id, request]));
+  const messagesByRequestId = new Map<string, DbRequestMessageRow[]>();
+  for (const message of (messageRows ?? []) as DbRequestMessageRow[]) {
+    const current = messagesByRequestId.get(message.request_id) ?? [];
+    current.push(message);
+    messagesByRequestId.set(message.request_id, current);
+  }
 
   return {
-    sentOffers: data.map((offer) => mapOffer(offer, requestsById.get(offer.request_id))),
+    sentOffers: data.map((offer) => {
+      const request = requestsById.get(offer.request_id);
+      const mappedOffer = mapOffer(offer, request);
+
+      return {
+        ...mappedOffer,
+        timelineMessages: mapRequestNegotiationMessages({
+          messages: messagesByRequestId.get(offer.request_id) ?? [],
+          buyerId: request?.buyer_id,
+          sellerId: offer.seller_id,
+        }),
+      };
+    }),
     activeClaims,
     performance,
     recentReviews,
@@ -2369,6 +2466,11 @@ export async function createSellerResponse(input: SellerResponseInput) {
     message: "Too many offers were sent too quickly. Please wait a minute and try again.",
   });
   const normalizedInput = normalizeSellerResponseInput(input);
+  const moderationError = validateMarketplaceMessage({ message: normalizedInput.message });
+
+  if (moderationError) {
+    throw new Error(moderationError);
+  }
 
   const { data: profileRow, error: profileError } = await supabase
     .from("profiles")
@@ -2432,6 +2534,147 @@ export async function createSellerResponse(input: SellerResponseInput) {
       sendEmail: true,
     });
   }
+}
+
+export async function updateCounteredSellerOffer(input: SellerResponseInput & { offerId: string }) {
+  const supabase = await createClient();
+
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const user = await requireAuthenticatedActor();
+  await requireMarketplaceAccess();
+  await requireVerifiedPhone();
+  assertRateLimit({
+    scope: "offer-update",
+    actorKey: user.id,
+    limit: 8,
+    windowMs: 10 * 60 * 1000,
+    message: "Too many offer updates were sent too quickly. Please wait a minute and try again.",
+  });
+
+  const offerId = requireTrimmedText({
+    value: input.offerId,
+    label: "Offer information",
+    maxLength: 120,
+  });
+  const normalizedInput = normalizeSellerResponseInput(input);
+  const moderationError = validateMarketplaceMessage({ message: normalizedInput.message });
+
+  if (moderationError) {
+    throw new Error(moderationError);
+  }
+
+  const [{ data: offerRow, error: offerError }, { data: requestRow, error: requestError }, { data: profileRow, error: profileError }] =
+    await Promise.all([
+      supabase
+        .from("offers")
+        .select("id, request_id, seller_id, image_urls, status")
+        .eq("id", offerId)
+        .single(),
+      supabase
+        .from("requests")
+        .select("id, slug, title, buyer_id, status")
+        .eq("id", normalizedInput.requestId)
+        .single(),
+      supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .single(),
+    ]);
+
+  if (offerError || !offerRow) {
+    throw new Error(offerError?.message ?? "Offer not found.");
+  }
+
+  if (requestError || !requestRow) {
+    throw new Error(requestError?.message ?? "Request not found.");
+  }
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  if (offerRow.request_id !== normalizedInput.requestId) {
+    throw new Error("This offer does not belong to that request.");
+  }
+
+  if (offerRow.seller_id !== user.id) {
+    throw new Error("Only the seller who sent this offer can update it.");
+  }
+
+  if (requestRow.buyer_id === user.id) {
+    throw new Error("You cannot update your own request as a seller.");
+  }
+
+  if (offerRow.status !== "countered") {
+    throw new Error("Only countered offers can be updated by the seller.");
+  }
+
+  if (!["open", "negotiating"].includes(requestRow.status)) {
+    throw new Error("This request is no longer open for negotiation.");
+  }
+
+  const sellerDisplayName = profileRow?.display_name?.trim() || user.email?.split("@")[0] || "Seller";
+  const offerPriceCents = Math.round(normalizedInput.offeredPrice * 100);
+  const claimWindowLabel = `${normalizedInput.proposedClaimWindowHours} hours`;
+  const retainedImageUrls = parseMediaUrls(offerRow.image_urls);
+  const nextImageUrls = normalizedInput.imageUrls.length > 0 ? normalizedInput.imageUrls : retainedImageUrls;
+
+  const { data: updatedOfferRow, error: updateError } = await supabase
+    .from("offers")
+    .update({
+      offer_price_cents: offerPriceCents,
+      message: normalizedInput.message,
+      shipping_note: claimWindowLabel,
+      estimated_ship_time: `Seller: ${sellerDisplayName}`,
+      image_urls: nextImageUrls,
+      status: "pending",
+    })
+    .eq("id", offerId)
+    .eq("seller_id", user.id)
+    .eq("status", "countered")
+    .select("id")
+    .maybeSingle();
+
+  if (updateError || !updatedOfferRow) {
+    throw new Error(updateError?.message ?? "This countered offer was already changed. Refresh and try again.");
+  }
+
+  // We do not have a separate offer-events table yet, so this message is the durable
+  // audit breadcrumb that lets the timeline show what the seller changed after a counter.
+  const { error: messageError } = await supabase.from("messages").insert({
+    request_id: normalizedInput.requestId,
+    sender_id: user.id,
+    body: `Seller updated offer: ${formatCurrencyFromCents(offerPriceCents)}, ${claimWindowLabel} claim window. ${normalizedInput.message}`,
+  });
+
+  if (messageError) {
+    throw new Error(messageError.message);
+  }
+
+  const { error: requestUpdateError } = await supabase
+    .from("requests")
+    .update({
+      status: "negotiating",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", normalizedInput.requestId);
+
+  if (requestUpdateError) {
+    throw new Error(requestUpdateError.message);
+  }
+
+  await createNotification({
+    profileId: requestRow.buyer_id,
+    title: "Seller updated a countered offer",
+    body: `${sellerDisplayName} updated the price or claim window on ${requestRow.title}.`,
+    href: requestRow.slug ? `/requests/${requestRow.slug}` : "/dashboard?tab=buyer",
+    preferenceKey: "offers_claims",
+    sendEmail: true,
+  });
 }
 
 export async function updateClaimOfferDecision(input: {

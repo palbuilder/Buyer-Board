@@ -36,6 +36,8 @@ export type SellerOffer = {
   requestId: string;
   requestSlug?: string;
   requestTitle?: string;
+  requestBudgetLabel?: string;
+  requestPostedLabel?: string;
   sellerId?: string;
   sellerName: string;
   imageUrls: string[];
@@ -44,11 +46,15 @@ export type SellerOffer = {
   shippedWithinWindowRate: number;
   offeredPrice: number;
   offeredPriceLabel: string;
+  priceDeltaLabel?: string;
   message: string;
   etaLabel: string;
   proposedClaimWindowHours: number;
   claimLabel: string;
   status: "pending" | "accepted" | "declined" | "countered";
+  createdAt?: string;
+  createdLabel?: string;
+  timelineMessages?: NegotiationTimelineMessage[];
 };
 
 export type RelationshipStatus = {
@@ -81,6 +87,15 @@ export type NegotiationOfferHistoryItem = {
   createdLabel: string;
 };
 
+export type NegotiationTimelineMessage = {
+  id: string;
+  senderId: string;
+  actorLabel: "Buyer" | "Seller";
+  body: string;
+  createdAt: string;
+  createdLabel: string;
+};
+
 export type DirectNegotiationContext = {
   requestId: string;
   requestSlug: string;
@@ -89,11 +104,25 @@ export type DirectNegotiationContext = {
   sellerId: string;
   latestOfferStatus: SellerOffer["status"];
   latestOfferPriceLabel: string;
+  latestOfferPriceDeltaLabel?: string;
   latestClaimWindowLabel: string;
   latestOfferStatusLabel: string;
   shippingLabel: string;
   locationLabel: string;
   history: NegotiationOfferHistoryItem[];
+};
+
+export type NegotiationTimelineItem = {
+  id: string;
+  actorLabel: "Buyer" | "Seller" | "System";
+  title: string;
+  detail: string;
+  timestampLabel: string;
+  priceLabel?: string;
+  priceDeltaLabel?: string;
+  claimWindowLabel?: string;
+  statusLabel?: string;
+  isCurrent?: boolean;
 };
 
 export type DirectMessageItem = {

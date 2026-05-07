@@ -72,6 +72,19 @@ function main() {
   assertIncludes(dashboardPage, "Admin workspace", "Admin queues should live in a dedicated admin dashboard section.");
   assertIncludes(dashboardPage, "Open request", "Dashboard request and claim cards should expose clear open-request actions.");
   assertIncludes(dashboardPage, "Review counteroffer", "Seller countered-offer cards should expose a direct review action.");
+  assertIncludes(dashboardPage, "NegotiationTimeline", "Dashboard deal cards should show the reusable negotiation timeline.");
+  assertIncludes(dashboardPage, "const buyerCanAct = offer.status === \"pending\";", "Buyer action buttons should only show while a seller offer is waiting on buyer review.");
+  assertIncludes(dashboardPage, "updateCounteredOffer", "Sellers should be able to update a countered offer without creating a duplicate offer.");
+
+  const negotiationTimeline = readProjectFile("app/components/negotiation-timeline.tsx");
+  assertIncludes(negotiationTimeline, "Seller reviewing counteroffer", "Negotiation timeline should make the countered-offer state obvious.");
+  assertIncludes(negotiationTimeline, "priceDeltaLabel", "Negotiation timeline should display pricing delta context.");
+
+  const requestLogic = readProjectFile("lib/requests.ts");
+  assertIncludes(requestLogic, "export function formatOfferPriceDeltaLabel", "Offer terms should expose a shared price delta formatter.");
+  assertIncludes(requestLogic, "export async function updateCounteredSellerOffer", "Seller counteroffer updates should be handled in the request service layer.");
+  assertIncludes(requestLogic, "status: \"pending\"", "Seller counteroffer updates should return the same offer row to buyer review.");
+  assertIncludes(requestLogic, "Seller updated offer:", "Seller counteroffer updates should write a timeline-friendly request message.");
 
   const requestsPage = readProjectFile("app/requests/page.tsx");
   assertIncludes(requestsPage, "node scripts/dev-seed.mjs", "Requests page should help local testers understand the seed preview vs apply path.");

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentPhoneVerificationRequest, getCurrentProfile, getSellerTrustGate, requireCurrentUser } from "@/lib/auth";
 import { ImageStrip } from "@/app/components/image-strip";
+import { NegotiationTimeline, buildNegotiationTimeline, getOfferCurrentState } from "@/app/components/negotiation-timeline";
 import { getCurrentNotificationPreferences, getCurrentNotifications } from "@/lib/notifications";
 import { formatStoredUsPhoneNumber } from "@/lib/phone";
 import { hasEmailDeliveryEnv } from "@/lib/email/config";
@@ -28,12 +29,13 @@ import {
   submitSellerDisputeResponse,
   submitPhoneVerificationRequest,
   submitTrustAppeal,
+  updateCounteredOffer,
   addWebhookSubscription,
   removeWebhookSubscription,
   toggleSellerDigestDelivery,
   toggleWebhookSubscription,
 } from "./actions";
-import { getBuyerDashboardData, getBuyerDashboardSummary, getCurrentTrustAppeal, getSellerDashboardData, getSellerDashboardSummary, syncBuyerBillingSetup, syncClaimCheckoutPayment, syncSellerPayoutStatus } from "@/lib/requests";
+import { formatOfferPriceDeltaLabel, getBuyerDashboardData, getBuyerDashboardSummary, getCurrentTrustAppeal, getSellerDashboardData, getSellerDashboardSummary, syncBuyerBillingSetup, syncClaimCheckoutPayment, syncSellerPayoutStatus } from "@/lib/requests";
 
 type DashboardPageProps = {
   searchParams: Promise<{
@@ -56,7 +58,7 @@ type DashboardPageProps = {
 const statusLabels: Record<string, string> = {
   pending: "Awaiting buyer review",
   accepted: "Accepted by buyer",
-  declined: "Denied by buyer",
+  declined: "Declined by buyer",
   countered: "Countered by buyer",
 };
 
@@ -929,12 +931,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </div>
               ) : null}
               <div className="mt-5 grid max-h-[46rem] gap-4 overflow-y-auto pr-1">
-                {sortedBuyerOfferCards.map(({ request, offer }) => (
+                {sortedBuyerOfferCards.map(({ request, offer }) => {
+                  const currentState = getOfferCurrentState(offer.status);
+                  const priceDeltaLabel = offer.priceDeltaLabel ?? formatOfferPriceDeltaLabel(offer.offeredPrice, request.targetBudget);
+                  const timelineItems = buildNegotiationTimeline({
+                    request,
+                    offer,
+                    priceDeltaLabel,
+                  });
+                  const buyerCanAct = offer.status === "pending";
+
+                  return (
                     <div key={offer.id} className="rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">{request.title}</p>
+                          <Link className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500 hover:text-[var(--hero)]" href={`/requests/${request.slug}`}>
+                            {request.title}
+                          </Link>
                           <p className="mt-1 text-xl font-semibold">{offer.offeredPriceLabel}</p>
+                          <p className="mt-1 text-sm text-[var(--ink-soft)]">{priceDeltaLabel}</p>
                           {offer.sellerId ? (
                             <p className="mt-2 text-sm text-[var(--ink-soft)]">
                               Seller:{" "}
@@ -954,7 +969,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           Waiting on your choice
                         </div>
                       ) : null}
-                      {offer.status === "pending" || offer.status === "countered" ? (
+                      {buyerCanAct ? (
                         <div className="subtle-panel mt-3 rounded-[1rem] px-3 py-2.5">
                           <p className="text-xs leading-6 text-[var(--ink-soft)]">
                             If you accept this offer, this seller gets the active claim and you will fund the order next.
@@ -983,32 +998,39 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="soft-chip-muted">{offer.claimLabel}</span>
+                        <span className="soft-chip-muted">{priceDeltaLabel}</span>
                         <span className="soft-chip-muted">{request.shipping}</span>
                       </div>
+                      <NegotiationTimeline
+                        currentStateLabel={currentState.label}
+                        currentStateDetail={currentState.detail}
+                        items={timelineItems}
+                        requestHref={`/requests/${request.slug}`}
+                      />
                       <div className="mt-4 flex flex-wrap gap-3">
                         <Link className="ghost-action" href={`/requests/${request.slug}`}>
-                          Review on request
+                          Open request
                         </Link>
                         {offer.sellerId ? (
                           <Link className="ghost-action" href={`/sellers/${offer.sellerId}`}>
                             View seller profile
                           </Link>
                         ) : null}
-                        {offer.status !== "accepted" ? (
+                        {buyerCanAct ? (
                           <form action={acceptClaimOffer}>
                             <input type="hidden" name="offerId" value={offer.id} />
                             <input type="hidden" name="requestId" value={request.id} />
                             <button className="brand-button rounded-full px-4 py-2 text-sm font-medium">Accept and continue</button>
                           </form>
                         ) : null}
-                        {offer.status !== "declined" ? (
+                        {buyerCanAct ? (
                           <form action={denyClaimOffer}>
                             <input type="hidden" name="offerId" value={offer.id} />
                             <input type="hidden" name="requestId" value={request.id} />
                             <button className="ghost-action">Deny claim</button>
                           </form>
                         ) : null}
-                        {offer.status !== "accepted" ? (
+                        {buyerCanAct ? (
                           <form action={counterClaimOffer} className="flex flex-wrap gap-2">
                             <input type="hidden" name="offerId" value={offer.id} />
                             <input type="hidden" name="requestId" value={request.id} />
@@ -1020,9 +1042,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                             <button className="ghost-action text-teal-800">Send counteroffer</button>
                           </form>
                         ) : null}
+                        {offer.status === "countered" ? (
+                          <div className="subtle-panel rounded-full px-4 py-2 text-sm text-[var(--ink-soft)]">
+                            Waiting for the seller to respond to your counteroffer.
+                          </div>
+                        ) : null}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
                 {buyerData.offersByRequest.every(({ offers }) => offers.length === 0) ? (
                   <div className="empty-state rounded-[1rem]">
                     No claim offers have been sent yet.
@@ -1136,7 +1164,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
             </div>
 
-            <div className="modern-card rounded-[1.75rem] p-5">
+            <div className="modern-card order-4 rounded-[1.75rem] p-5">
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Seller profile</p>
               <h2 className="mt-2 text-2xl font-semibold">Performance snapshot</h2>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -1208,7 +1236,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
             </div>
 
-            <div className="modern-card rounded-[1.75rem] p-5 lg:col-span-2">
+            <div className="modern-card order-5 rounded-[1.75rem] p-5 lg:col-span-2">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Seller intelligence</p>
@@ -1380,7 +1408,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
             </div>
 
-            <div className="modern-card rounded-[1.75rem] p-5">
+            <div className="modern-card order-2 rounded-[1.75rem] p-5">
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Active claims</p>
               <h2 className="mt-2 text-2xl font-semibold">Orders you need to ship now</h2>
               <div className="subtle-panel mt-4 rounded-[1rem] px-4 py-3">
@@ -1393,7 +1421,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div key={claim.claimId} className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">{claim.requestTitle}</p>
+                        <Link className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500 hover:text-[var(--hero)]" href={`/requests/${claim.requestSlug}`}>
+                          {claim.requestTitle}
+                        </Link>
                         <p className="mt-1 text-lg font-semibold">{claim.approvedOfferLabel}</p>
                       </div>
                       <span
@@ -1432,7 +1462,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
             </div>
 
-            <div className="rounded-[1.75rem] border border-black/8 bg-white/80 p-5">
+            <div className="order-3 rounded-[1.75rem] border border-black/8 bg-white/80 p-5">
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Claim offers sent</p>
               <h2 className="mt-2 text-2xl font-semibold">See which offers need your next move</h2>
               <div className="subtle-panel mt-4 rounded-[1rem] px-4 py-3">
@@ -1441,12 +1471,31 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </p>
               </div>
               <div className="mt-5 space-y-3">
-                {sellerData.sentOffers.map((offer) => (
+                {sellerData.sentOffers.map((offer) => {
+                  const currentState = getOfferCurrentState(offer.status);
+                  const timelineItems = buildNegotiationTimeline({
+                    request: {
+                      title: offer.requestTitle ?? "Buyer request",
+                      postedLabel: offer.requestPostedLabel ?? offer.createdLabel ?? "Recently",
+                      budgetLabel: offer.requestBudgetLabel ?? "Request target",
+                    },
+                    offer,
+                    priceDeltaLabel: offer.priceDeltaLabel,
+                  });
+
+                  return (
                   <div key={offer.id} className="rounded-[1.25rem] border border-stone-200 bg-stone-50 p-4">
-                    <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">
-                      {offer.requestTitle ?? "Sent offer"}
-                    </p>
+                    {offer.requestSlug ? (
+                      <Link className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500 hover:text-[var(--hero)]" href={`/requests/${offer.requestSlug}`}>
+                        {offer.requestTitle ?? "Sent offer"}
+                      </Link>
+                    ) : (
+                      <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">
+                        {offer.requestTitle ?? "Sent offer"}
+                      </p>
+                    )}
                     <p className="mt-1 text-lg font-semibold">{offer.offeredPriceLabel}</p>
+                    {offer.priceDeltaLabel ? <p className="mt-1 text-sm text-[var(--ink-soft)]">{offer.priceDeltaLabel}</p> : null}
                     <p className="mt-2 text-sm text-[var(--ink-soft)]">{offer.claimLabel}</p>
                     <p className="mt-1 text-sm text-[var(--ink-soft)]">{offer.message}</p>
                     <ImageStrip imageUrls={offer.imageUrls} altPrefix={`${offer.sellerName} sent offer`} />
@@ -1473,6 +1522,59 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         Buyer passed on this offer. You can move on or respond again later if the request reopens.
                       </p>
                     ) : null}
+                    <NegotiationTimeline
+                      currentStateLabel={currentState.label}
+                      currentStateDetail={currentState.detail}
+                      items={timelineItems}
+                      requestHref={offer.requestSlug ? `/requests/${offer.requestSlug}` : undefined}
+                    />
+                    {offer.status === "countered" ? (
+                      <form action={updateCounteredOffer} className="mt-4 rounded-[1.25rem] border border-teal-200 bg-white p-4">
+                        <input type="hidden" name="offerId" value={offer.id} />
+                        <input type="hidden" name="requestId" value={offer.requestId} />
+                        <p className="font-mono text-xs uppercase tracking-[0.18em] text-stone-500">Update countered offer</p>
+                        <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                          Send revised terms back to the buyer. This reopens the same offer for buyer review instead of creating a duplicate offer.
+                        </p>
+                        <div className="mt-4 grid gap-3 md:grid-cols-[0.65fr_0.75fr_1.4fr_auto]">
+                          <label className="grid gap-2 text-sm font-medium">
+                            Price
+                            <input
+                              name="offeredPrice"
+                              defaultValue={offer.offeredPrice}
+                              className="rounded-2xl border border-black/10 bg-white px-4 py-3"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="grid gap-2 text-sm font-medium">
+                            Claim window
+                            <select
+                              name="claimWindowHours"
+                              defaultValue={offer.proposedClaimWindowHours}
+                              className="rounded-2xl border border-black/10 bg-white px-4 py-3"
+                            >
+                              <option value="24">24 hours</option>
+                              <option value="48">48 hours</option>
+                              <option value="72">72 hours</option>
+                              <option value="120">5 days</option>
+                              <option value="168">7 days</option>
+                            </select>
+                          </label>
+                          <label className="grid gap-2 text-sm font-medium">
+                            Message
+                            <input
+                              name="message"
+                              defaultValue={offer.message}
+                              className="rounded-2xl border border-black/10 bg-white px-4 py-3"
+                              placeholder="Tell the buyer what changed"
+                            />
+                          </label>
+                          <div className="flex items-end">
+                            <button className="brand-button rounded-full px-4 py-3 text-sm font-medium">Update offer</button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : null}
                     <div className="mt-4 flex flex-wrap gap-3">
                       {offer.requestSlug ? (
                         <Link className={offer.status === "countered" ? "brand-button rounded-full px-4 py-2 text-sm font-medium" : "ghost-action"} href={`/requests/${offer.requestSlug}`}>
@@ -1486,7 +1588,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       ) : null}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 {sellerData.sentOffers.length === 0 ? (
                   <div className="empty-state rounded-[1rem]">
                     No offers sent yet. Send your first claim offer from a request page to start negotiating.

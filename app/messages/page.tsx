@@ -279,7 +279,8 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
                         <p className="font-mono text-xs uppercase tracking-[0.16em] text-stone-500">Live deal terms</p>
                         <h3 className="mt-2 text-lg font-semibold">{negotiationContext.requestTitle}</h3>
                         <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-                          Current offer: {negotiationContext.latestOfferPriceLabel}. Claim window: {negotiationContext.latestClaimWindowLabel}. Status:{" "}
+                          Current offer: {negotiationContext.latestOfferPriceLabel}
+                          {negotiationContext.latestOfferPriceDeltaLabel ? ` (${negotiationContext.latestOfferPriceDeltaLabel})` : ""}. Claim window: {negotiationContext.latestClaimWindowLabel}. Status:{" "}
                           {negotiationContext.latestOfferStatusLabel.toLowerCase()}.
                         </p>
                       </div>
@@ -289,7 +290,7 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
                       <Link className="ghost-action" href={`/requests/${negotiationContext.requestSlug}`}>
                         Open request
                       </Link>
-                      {viewerRoleInThread === "buyer" && (latestOfferStatus === "pending" || latestOfferStatus === "countered") ? (
+                      {viewerRoleInThread === "buyer" && latestOfferStatus === "pending" ? (
                         <Link className="brand-button rounded-full px-4 py-2 text-sm font-medium" href="/dashboard?tab=buyer">
                           Review offer
                         </Link>
@@ -319,6 +320,9 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
                       <div className="rounded-[1rem] border border-stone-200 bg-stone-50 px-3 py-3">
                         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-stone-500">Price</p>
                         <p className="mt-2 text-lg font-semibold">{negotiationContext.latestOfferPriceLabel}</p>
+                        {negotiationContext.latestOfferPriceDeltaLabel ? (
+                          <p className="mt-1 text-xs text-stone-500">{negotiationContext.latestOfferPriceDeltaLabel}</p>
+                        ) : null}
                       </div>
                       <div className="rounded-[1rem] border border-stone-200 bg-stone-50 px-3 py-3">
                         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-stone-500">Claim window</p>

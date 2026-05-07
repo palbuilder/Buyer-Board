@@ -11,7 +11,7 @@ import { normalizeUsPhoneNumber } from "@/lib/phone";
 import { createStripeServerClient } from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSellerDigestSubscription, deleteSellerDigestSubscription, updateSellerDigestSubscription } from "@/lib/integrations";
-import { completeSellerClaim, confirmRequestFreshness, reportTransactionIssue, respondToDispute, startClaimCheckout as beginClaimCheckoutRequest, updateClaimOfferDecision } from "@/lib/requests";
+import { completeSellerClaim, confirmRequestFreshness, reportTransactionIssue, respondToDispute, startClaimCheckout as beginClaimCheckoutRequest, updateClaimOfferDecision, updateCounteredSellerOffer } from "@/lib/requests";
 import { submitTransactionReview as saveTransactionReview } from "@/lib/requests";
 
 function rethrowRedirect(error: unknown) {
@@ -100,6 +100,42 @@ export async function counterClaimOffer(formData: FormData) {
     successNotice: "Counteroffer sent to seller",
     fallbackError: "Unable to counter claim offer.",
   });
+}
+
+export async function updateCounteredOffer(formData: FormData) {
+  const offerId = String(formData.get("offerId") ?? "").trim();
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  const offeredPrice = Number(String(formData.get("offeredPrice") ?? "").trim());
+  const message = String(formData.get("message") ?? "").trim();
+  const proposedClaimWindowHours = Number(String(formData.get("claimWindowHours") ?? "").trim());
+  const imageUrls = parseImageUrlsFromFormValue(String(formData.get("imageUrls") ?? ""));
+
+  if (!offerId || !requestId || !Number.isFinite(offeredPrice) || !message || !Number.isInteger(proposedClaimWindowHours)) {
+    redirect("/dashboard?tab=seller&error=Add a price, message, and claim window before updating the counteroffer.");
+  }
+
+  try {
+    await updateCounteredSellerOffer({
+      offerId,
+      requestId,
+      offeredPrice,
+      message,
+      proposedClaimWindowHours,
+      imageUrls,
+    });
+  } catch (error) {
+    rethrowRedirect(error);
+    const errorMessage = error instanceof Error ? error.message : "Unable to update this countered offer.";
+    if (errorMessage === "Sign in required.") {
+      redirect("/auth?next=/dashboard?tab=seller");
+    }
+    redirect(`/dashboard?tab=seller&error=${encodeURIComponent(errorMessage)}`);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/requests");
+  revalidatePath("/messages");
+  redirect("/dashboard?tab=seller&notice=Updated offer sent back to the buyer");
 }
 
 export async function confirmBuyerRequestFreshness(formData: FormData) {
